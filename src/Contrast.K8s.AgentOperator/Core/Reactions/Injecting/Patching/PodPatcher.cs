@@ -341,9 +341,6 @@ public class PodPatcher : IPodPatcher
                     }
                 }
 
-
-
-            
             }
         }
 
