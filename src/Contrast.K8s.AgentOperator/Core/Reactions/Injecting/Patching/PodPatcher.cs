@@ -340,7 +340,6 @@ public class PodPatcher : IPodPatcher
                         yield return new V1EnvVar($"CONTRAST__{key.Replace(".", "__").ToUpperInvariant()}", value);
                     }
                 }
-
             }
         }
 
