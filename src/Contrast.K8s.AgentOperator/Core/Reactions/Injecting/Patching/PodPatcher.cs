@@ -287,6 +287,46 @@ public class PodPatcher : IPodPatcher
             )
         );
 
+        // TODO: Add configuration to enable this part
+
+        yield return new V1EnvVar(
+            "POD_NAMESPACE",
+            valueFrom: new V1EnvVarSource(
+                fieldRef: new V1ObjectFieldSelector("metadata.namespace")
+            )
+        );
+        
+
+        //For each labels create an env variabale
+            foreach (var (key, value) in pod.Metadata.Labels)
+            {
+                if (!string.IsNullOrWhiteSpace(key)
+                    && !string.IsNullOrWhiteSpace(value))
+                {
+                    yield return new V1EnvVar(
+                        $"LABEL_{key.Replace("/", "").Replace("-", "").Replace(".", "").ToUpper()}",
+                        valueFrom: new V1EnvVarSource(
+                            fieldRef: new V1ObjectFieldSelector("metadata.labels['"+key+"']")
+                    ));
+                }
+            }
+
+
+
+        //For each annotations create an env variable
+        foreach (var (key, value) in pod.Metadata.Annotations)
+        {
+            if (!string.IsNullOrWhiteSpace(key)
+                && !string.IsNullOrWhiteSpace(value))
+            {
+                    yield return new V1EnvVar($"ANNOTATION_{key.Replace("/", "").Replace("-", "").Replace(".", "").ToUpper()}",
+                    valueFrom: new V1EnvVarSource(
+                        fieldRef: new V1ObjectFieldSelector("metadata.annotations['"+key+"']")
+                    ));            
+            }
+        }
+
+
         if (configuration?.YamlKeys is { } yamlKeys)
         {
             foreach (var (key, value) in yamlKeys)
