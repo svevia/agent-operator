@@ -116,7 +116,7 @@ public class PodPatcher : IPodPatcher
             var writableVolumeMount = new V1VolumeMount(context.WritableMountPath, writableVolume.Name, readOnlyProperty: false);
             container.VolumeMounts.AddOrUpdate(writableVolumeMount.Name, writableVolumeMount);
 
-            var genericPatches = GenerateEnvVars(context);
+            var genericPatches = GenerateEnvVars(context, pod);
             var agentPatches = agentPatcher?.GenerateEnvVars(context) ?? Array.Empty<V1EnvVar>();
 
             foreach (var envVar in genericPatches.Concat(agentPatches))
@@ -258,7 +258,7 @@ public class PodPatcher : IPodPatcher
         }
     }
 
-    private IEnumerable<V1EnvVar> GenerateEnvVars(PatchingContext context)
+    private IEnumerable<V1EnvVar> GenerateEnvVars(PatchingContext context, V1Pod pod)
     {
         var (workloadName, workloadNamespace, _, connection, configuration, agentMountPath, writableMountPath) = context;
 
