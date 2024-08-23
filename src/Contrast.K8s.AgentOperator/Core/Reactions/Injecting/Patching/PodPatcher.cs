@@ -134,6 +134,57 @@ public class PodPatcher : IPodPatcher
         }
     }
 
+
+
+    private (string,  List<V1EnvVar>) GetVarsFromCluster(string value, V1Pod pod, PatchingContext context)
+    {
+        //init IEnumerable<V1EnvVar> to store additional env variables
+        List<V1EnvVar> additionalKeys = new List<V1EnvVar>();
+
+        
+        //Pattern matching for everything starting with % and ending with %
+        string pattern = @"%(.*?)%";
+        var matches = System.Text.RegularExpressions.Regex.Matches(value, pattern);
+        foreach (System.Text.RegularExpressions.Match match in matches)
+        {
+            string key = match.Groups[1].Value;
+            if (key.Contains("namespace"))
+            {
+                additionalKeys.Add(new V1EnvVar(
+                "POD_NAMESPACE",
+                valueFrom: new V1EnvVarSource(
+                    fieldRef: new V1ObjectFieldSelector("metadata.namespace")
+                )));
+                value = value.Replace("%namespace%", "$(POD_NAMESPACE)");
+            }
+            else if (key.Contains("labels"))
+            {
+                key = key.Replace("labels.", "");
+                string envVariableName = $"LABEL_{key.Replace("/", "").Replace("-", "").Replace(".", "").ToUpper()}";
+                additionalKeys.Add(new V1EnvVar(
+                        envVariableName,
+                        valueFrom: new V1EnvVarSource(
+                            fieldRef: new V1ObjectFieldSelector("metadata.labels['"+key+"']")
+                    )));
+
+                value = value.Replace("%labels."+key+"%", "$("+envVariableName+")");
+            }
+            else if (key.Contains("annotations"))
+            {
+                key = key.Replace("annotations.", "");
+                string envVariableName = $"ANNOTATIONS_{key.Replace("/", "").Replace("-", "").Replace(".", "").ToUpper()}";
+                additionalKeys.Add(new V1EnvVar(
+                        envVariableName,
+                        valueFrom: new V1EnvVarSource(
+                            fieldRef: new V1ObjectFieldSelector("metadata.annotations['"+key+"']")
+                    )));
+
+                value = value.Replace("%annotations."+key+"%", "$("+envVariableName+")");
+            }
+        }
+        return (value, additionalKeys);
+    }
+
     private V1Container CreateInitContainer(PatchingContext context,
                                             V1Volume agentVolume,
                                             V1Volume writableVolume,
@@ -287,46 +338,6 @@ public class PodPatcher : IPodPatcher
             )
         );
 
-        // TODO: Add configuration to enable this part
-
-        yield return new V1EnvVar(
-            "POD_NAMESPACE",
-            valueFrom: new V1EnvVarSource(
-                fieldRef: new V1ObjectFieldSelector("metadata.namespace")
-            )
-        );
-        
-
-        //For each labels create an env variabale
-            foreach (var (key, value) in pod.Metadata.Labels)
-            {
-                if (!string.IsNullOrWhiteSpace(key)
-                    && !string.IsNullOrWhiteSpace(value))
-                {
-                    yield return new V1EnvVar(
-                        $"LABEL_{key.Replace("/", "").Replace("-", "").Replace(".", "").ToUpper()}",
-                        valueFrom: new V1EnvVarSource(
-                            fieldRef: new V1ObjectFieldSelector("metadata.labels['"+key+"']")
-                    ));
-                }
-            }
-
-
-
-        //For each annotations create an env variable
-        foreach (var (key, value) in pod.Metadata.Annotations)
-        {
-            if (!string.IsNullOrWhiteSpace(key)
-                && !string.IsNullOrWhiteSpace(value))
-            {
-                    yield return new V1EnvVar($"ANNOTATION_{key.Replace("/", "").Replace("-", "").Replace(".", "").ToUpper()}",
-                    valueFrom: new V1EnvVarSource(
-                        fieldRef: new V1ObjectFieldSelector("metadata.annotations['"+key+"']")
-                    ));            
-            }
-        }
-
-
         if (configuration?.YamlKeys is { } yamlKeys)
         {
             foreach (var (key, value) in yamlKeys)
@@ -334,8 +345,21 @@ public class PodPatcher : IPodPatcher
                 if (!string.IsNullOrWhiteSpace(key)
                     && !string.IsNullOrWhiteSpace(value))
                 {
-                    yield return new V1EnvVar($"CONTRAST__{key.Replace(".", "__").ToUpperInvariant()}", value);
-                }
+                    // TODO: Add configuration to enable this part
+                    if (value.Contains("%"))
+                    {
+                        (string newValue, List<V1EnvVar> additionalKeys) = GetVarsFromCluster(value, pod, context);
+                        foreach (var envVar in additionalKeys)
+                        {
+                            yield return envVar;
+                        }
+                        yield return new V1EnvVar($"CONTRAST__{key.Replace(".", "__").ToUpperInvariant()}", newValue);
+
+                    }
+                    else
+                    {
+                        yield return new V1EnvVar($"CONTRAST__{key.Replace(".", "__").ToUpperInvariant()}", value);
+                    }                }
             }
         }
 
