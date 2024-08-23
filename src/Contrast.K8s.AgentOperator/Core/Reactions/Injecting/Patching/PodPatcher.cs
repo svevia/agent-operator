@@ -116,6 +116,7 @@ public class PodPatcher : IPodPatcher
             var writableVolumeMount = new V1VolumeMount(context.WritableMountPath, writableVolume.Name, readOnlyProperty: false);
             container.VolumeMounts.AddOrUpdate(writableVolumeMount.Name, writableVolumeMount);
 
+
             var genericPatches = GenerateEnvVars(context, pod);
             var agentPatches = agentPatcher?.GenerateEnvVars(context) ?? Array.Empty<V1EnvVar>();
 
@@ -133,8 +134,6 @@ public class PodPatcher : IPodPatcher
             agentPatcher?.PatchContainer(container, context);
         }
     }
-
-
 
     private (string,  List<V1EnvVar>) GetVarsFromCluster(string value, V1Pod pod, PatchingContext context)
     {
@@ -183,6 +182,7 @@ public class PodPatcher : IPodPatcher
             }
         }
         return (value, additionalKeys);
+
     }
 
     private V1Container CreateInitContainer(PatchingContext context,
@@ -338,6 +338,7 @@ public class PodPatcher : IPodPatcher
             )
         );
 
+
         if (configuration?.YamlKeys is { } yamlKeys)
         {
             foreach (var (key, value) in yamlKeys)
@@ -345,6 +346,7 @@ public class PodPatcher : IPodPatcher
                 if (!string.IsNullOrWhiteSpace(key)
                     && !string.IsNullOrWhiteSpace(value))
                 {
+
                     // TODO: Add configuration to enable this part
                     if (value.Contains("%"))
                     {
@@ -359,7 +361,8 @@ public class PodPatcher : IPodPatcher
                     else
                     {
                         yield return new V1EnvVar($"CONTRAST__{key.Replace(".", "__").ToUpperInvariant()}", value);
-                    }                }
+                    }                
+                }
             }
         }
 
